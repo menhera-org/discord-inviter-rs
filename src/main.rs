@@ -99,12 +99,6 @@ async fn handler_invited(
         return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
     };
 
-    let request_token = if let Ok(token) = hex::decode(request_token) {
-        token
-    } else {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
-    };
-
     let signature = if let Ok(signature) = hex::decode(signature) {
         signature
     } else {
@@ -119,9 +113,15 @@ async fn handler_invited(
     };
 
     let signature = ed25519_dalek::Signature::from_bytes(&signature);
-    if !public_key.verify(&request_token, &signature).is_ok() {
+    if !public_key.verify(request_token.as_bytes(), &signature).is_ok() {
         return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
     }
+
+    let request_token = if let Ok(token) = hex::decode(request_token) {
+        token
+    } else {
+        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+    };
 
     let request_token = request_token[0..8].try_into() as Result<[u8; 8], _>;
     let request_token = match request_token {
