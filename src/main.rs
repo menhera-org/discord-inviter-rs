@@ -6,7 +6,6 @@ use std::str::FromStr;
 use url::Url;
 
 use axum::{
-    http::Request,
     routing::{get, post},
     Router,
     response::Response,
@@ -19,6 +18,7 @@ use axum::{
 };
 
 use axum::http::{
+    Request,
     StatusCode,
     HeaderMap,
     HeaderName,
@@ -79,6 +79,7 @@ async fn handler_root() -> impl IntoResponse {
 
 async fn handler_invited(
     Query(query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let discord_token = env::var("DISCORD_TOKEN").unwrap_or("".to_string());
     let discord_channel_id = env::var("DISCORD_CHANNEL_ID").unwrap_or("".to_string());
@@ -135,6 +136,45 @@ async fn handler_invited(
         return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
     }
 
+    // should include just one IP address and port
+    let real_ip = headers.get("x-real-ip").map(|value| value.to_str().unwrap().to_string());
+    let user_agent = headers.get("user-agent").map(|value| value.to_str().unwrap().to_string());
+
+    let discord_webhook_url = env::var("DISCORD_WEBHOOK_URL").unwrap_or("".to_string());
+
+    let discord_webhook_body = serde_json::json!({
+        "content": "Someone has passed the captcha!",
+        "embeds": [
+            {
+                "title": "Captcha Passed",
+                "description": "Someone has passed the captcha to join Discord server!",
+                "fields": [
+                    {
+                        "name": "IP Address",
+                        "value": real_ip.unwrap_or("Unknown".to_string()),
+                        "inline": true
+                    },
+                    {
+                        "name": "User Agent",
+                        "value": user_agent.unwrap_or("Unknown".to_string()),
+                        "inline": true
+                    }
+                ],
+                "color": 0x00FF00
+            }
+        ]
+    });
+
+    let http_client = reqwest::Client::new();
+    let result = http_client.post(&discord_webhook_url)
+        .json(&discord_webhook_body)
+        .send()
+        .await;
+
+    if let Err(e) = result {
+        eprintln!("Failed to send webhook: {:?}", e);
+    }
+
     let discord_channel_id = ChannelId::new(discord_channel_id.parse().unwrap());
 
     let http_client = serenity::http::Http::new(&discord_token);
@@ -143,7 +183,15 @@ async fn handler_invited(
         "max_age": 600,
         "max_uses": 1,
         "unique": true,
-    }), reason).await.unwrap().url();
+    }), reason).await;
+
+    let invite = match invite {
+        Ok(invite) => invite.url(),
+        Err(e) => {
+            eprintln!("Failed to create invite: {:?}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
+        }
+    };
     
     let mut header_map = HeaderMap::new();
     header_map.insert(HeaderName::from_static("location"), invite.parse().unwrap());
