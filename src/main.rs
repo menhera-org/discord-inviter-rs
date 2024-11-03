@@ -137,8 +137,32 @@ async fn handler_invited(
     }
 
     // should include just one IP address and port
-    let real_ip = headers.get("x-real-ip").map(|value| value.to_str().unwrap().to_string());
+    let real_ip = headers.get("x-real-ip").map(|value| value.to_str().unwrap().trim().to_string());
     let user_agent = headers.get("user-agent").map(|value| value.to_str().unwrap().to_string());
+
+    // fix broken IPv6 address (address:port, without [])
+    let real_ip = real_ip.map(|ip| {
+        let ip_clone = ip.clone();
+        let mut parts = ip.split(':').collect::<Vec<_>>();
+        if parts.len() == 1 {
+            return parts[0].to_string();
+        }
+        let port: u16 = parts.pop().unwrap().parse().unwrap_or(0);
+        if port == 0 {
+            return ip_clone;
+        }
+        let ip = parts.join(":");
+        let ip = ip.parse::<std::net::IpAddr>();
+        let ip = if let Ok(ip) = ip {
+            ip
+        } else {
+            return ip_clone;
+        };
+        let socket_addr = std::net::SocketAddr::new(ip, port);
+        socket_addr.to_string()
+    }).filter(|ip| {
+        ip.parse::<std::net::SocketAddr>().is_ok()
+    });
 
     let discord_webhook_url = env::var("DISCORD_WEBHOOK_URL").unwrap_or("".to_string());
 
@@ -150,7 +174,7 @@ async fn handler_invited(
                 "description": "Someone has passed the captcha to join Discord server!",
                 "fields": [
                     {
-                        "name": "IP Address",
+                        "name": "IP Address and Port",
                         "value": real_ip.unwrap_or("Unknown".to_string()),
                         "inline": true
                     },
