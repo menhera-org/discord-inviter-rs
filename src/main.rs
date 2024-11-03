@@ -59,7 +59,7 @@ async fn handler_root() -> impl IntoResponse {
     let expires = now + 60 * 5;
     let token = hex::encode(expires.to_be_bytes());
 
-    let callback_url = Url::parse(&server_url).unwrap().join("/invited").unwrap().to_string();
+    let callback_url = Url::parse(&server_url).unwrap().join("/invite/invited").unwrap().to_string();
 
     let mut captcha_url = Url::parse(&captcha_url).unwrap();
     captcha_url.query_pairs_mut().append_pair("redirect-url", &callback_url);
