@@ -90,50 +90,50 @@ async fn handler_invited(
     let request_token = if let Some(token) = query.get("request-token") {
         token
     } else {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+        return (StatusCode::BAD_REQUEST, "Bad Request: request token").into_response();
     };
 
     let signature = if let Some(signature) = query.get("signature") {
         signature
     } else {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+        return (StatusCode::BAD_REQUEST, "Bad Request: missing signature").into_response();
     };
 
     let signature = if let Ok(signature) = hex::decode(signature) {
         signature
     } else {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+        return (StatusCode::BAD_REQUEST, "Invalid signature encoding").into_response();
     };
 
     let signature = signature[0..64].try_into() as Result<[u8; 64], _>;
 
     let signature = match signature {
         Ok(signature) => signature,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Bad Request").into_response(),
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid signature length").into_response(),
     };
 
     let signature = ed25519_dalek::Signature::from_bytes(&signature);
     if !public_key.verify(request_token.as_bytes(), &signature).is_ok() {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+        return (StatusCode::BAD_REQUEST, "Invalid signature from CAPTCHA server").into_response();
     }
 
     let request_token = if let Ok(token) = hex::decode(request_token) {
         token
     } else {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+        return (StatusCode::BAD_REQUEST, "Invalid token").into_response();
     };
 
     let request_token = request_token[0..8].try_into() as Result<[u8; 8], _>;
     let request_token = match request_token {
         Ok(token) => token,
-        Err(_) => return (StatusCode::BAD_REQUEST, "Bad Request").into_response(),
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid token length").into_response(),
     };
 
     let request_token = u64::from_be_bytes(request_token);
     let now = std::time::UNIX_EPOCH.elapsed().unwrap().as_secs();
 
     if request_token < now || request_token > now + 60 * 5 {
-        return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
+        return (StatusCode::BAD_REQUEST, "Token expired").into_response();
     }
 
     // should include just one IP address and port
