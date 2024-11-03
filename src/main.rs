@@ -164,6 +164,24 @@ async fn handler_invited(
         ip.parse::<std::net::SocketAddr>().is_ok()
     });
 
+    let discord_channel_id = ChannelId::new(discord_channel_id.parse().unwrap());
+
+    let http_client = serenity::http::Http::new(&discord_token);
+    let reason = Some("Invited by captcha");
+    let invite = http_client.create_invite(discord_channel_id, &serde_json::json!({
+        "max_age": 600,
+        "max_uses": 1,
+        "unique": true,
+    }), reason).await;
+
+    let invite = match invite {
+        Ok(invite) => invite,
+        Err(e) => {
+            eprintln!("Failed to create invite: {:?}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
+        }
+    };
+    
     let discord_webhook_url = env::var("DISCORD_WEBHOOK_URL").unwrap_or("".to_string());
 
     let discord_webhook_body = serde_json::json!({
@@ -182,6 +200,11 @@ async fn handler_invited(
                         "name": "User Agent",
                         "value": user_agent.unwrap_or("Unknown".to_string()),
                         "inline": true
+                    },
+                    {
+                        "name": "Associated Invite Code",
+                        "value": invite.code.clone(),
+                        "inline": false
                     }
                 ],
                 "color": 0x00FF00
@@ -199,24 +222,7 @@ async fn handler_invited(
         eprintln!("Failed to send webhook: {:?}", e);
     }
 
-    let discord_channel_id = ChannelId::new(discord_channel_id.parse().unwrap());
-
-    let http_client = serenity::http::Http::new(&discord_token);
-    let reason = Some("Invited by captcha");
-    let invite = http_client.create_invite(discord_channel_id, &serde_json::json!({
-        "max_age": 600,
-        "max_uses": 1,
-        "unique": true,
-    }), reason).await;
-
-    let invite = match invite {
-        Ok(invite) => invite.url(),
-        Err(e) => {
-            eprintln!("Failed to create invite: {:?}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response();
-        }
-    };
-    
+    let invite = invite.url();
     let mut header_map = HeaderMap::new();
     header_map.insert(HeaderName::from_static("location"), invite.parse().unwrap());
 
