@@ -6,7 +6,7 @@ use std::str::FromStr;
 use url::Url;
 
 use axum::{
-    routing::{get, post},
+    routing::get,
     Router,
     response::Response,
     middleware::Next, body::Body,
@@ -216,7 +216,7 @@ async fn main() -> anyhow::Result<()> {
         // top page
         .route("/invite/", get(handler_root))
 
-        .route("/invite/invited", post(handler_invited))
+        .route("/invite/invited", get(handler_invited))
 
         // 404 page
         .fallback(handler_404)
