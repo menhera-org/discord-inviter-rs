@@ -105,7 +105,7 @@ async fn handler_invited(
         return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
     };
 
-    let signature = if let Ok(signature) = base64::prelude::BASE64_STANDARD.decode(signature) {
+    let signature = if let Ok(signature) = hex::decode(signature) {
         signature
     } else {
         return (StatusCode::BAD_REQUEST, "Bad Request").into_response();
