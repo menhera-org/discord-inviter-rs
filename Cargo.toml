@@ -1,0 +1,23 @@
+[package]
+name = "discord-inviter-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dotenvy = "0.15.7"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+axum = { version = "0.7.1", features = ["default", "multipart"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["fs"] }
+askama = "0.12.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.22.0"
+ed25519-dalek = "2"
+hex = "0.4"
+serenity = "0.12"
+url = "2.5.2"
